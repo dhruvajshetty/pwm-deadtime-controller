@@ -28,6 +28,11 @@ The fix is **dead-time insertion**: a small blanking window where both outputs a
 - Both hs_out and ls_out are **never HIGH simultaneously** — guaranteed by design
 
 ---
+## Timing Diagram
+![Dead-Time Waveform](waveform.png)
+```
+
+---
 
 ## Module 1: PWM Generator (`pwm_gen.v`)
 
