@@ -14,7 +14,7 @@ module tb_pwm;
   wire pwm_out;
   wire hs_out, ls_out;
 
-  // Instantiate PWM generator
+  //PWM generator
   pwm_gen #(.CNT_WIDTH(CNT_WIDTH)) u_pwm (
     .clk(clk),
     .rst(rst),
@@ -23,7 +23,7 @@ module tb_pwm;
     .pwm_out(pwm_out)
   );
 
-  // Instantiate dead-time module
+  //dead-time module
   dead_time #(.DEAD_CYCLES(DEAD_CYCLES)) u_dt (
     .clk(clk),
     .rst(rst),
