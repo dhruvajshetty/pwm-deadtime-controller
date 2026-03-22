@@ -10,7 +10,7 @@ module pwm_gen #(
 
   reg [CNT_WIDTH-1:0] counter;
 
-  // Counter: resets every period
+  
   always @(posedge clk or posedge rst) begin
     if (rst)
       counter <= 0;
