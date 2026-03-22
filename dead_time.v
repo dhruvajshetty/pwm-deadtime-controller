@@ -23,7 +23,7 @@ module dead_time #(
     else begin
       pwm_prev <= pwm_in;
 
-      // Detect any transition (rising or falling)
+      
       if (pwm_in !== pwm_prev) begin
         hs_out  <= 0;
         ls_out  <= 0;
@@ -31,7 +31,7 @@ module dead_time #(
         in_dead  <= 1;
       end
 
-      // Count through dead time
+    
       else if (in_dead) begin
         if (dead_cnt >= DEAD_CYCLES - 1) begin
           in_dead  <= 0;
@@ -42,7 +42,7 @@ module dead_time #(
           dead_cnt <= dead_cnt + 1;
       end
 
-      // Normal operation
+      
       else begin
         hs_out <= pwm_in;
         ls_out <= ~pwm_in;
