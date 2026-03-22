@@ -16,14 +16,6 @@ The fix is **dead-time insertion**: a small blanking window where both outputs a
 
 ![Architecture](arch.png)
 
-```
-Inputs          pwm_gen.v              dead_time.v         Outputs
-─────────       ───────────────        ──────────────      ────────
-duty[7:0]  ──►  8-bit counter     ──►  Transition          hs_out
-period[7:0]──►  duty compare      pwm  detector
-clk        ──►  logic             out  4-cycle blanking ──► ls_out
-rst        ──►                         HS / LS logic
-```
 
 - `pwm_gen.v` generates a raw PWM signal based on duty cycle and period
 - `dead_time.v` takes that signal and produces two complementary gate outputs with a safe blanking gap on every transition
@@ -34,18 +26,6 @@ rst        ──►                         HS / LS logic
 ## Timing Diagram
 
 ![Timing Diagram](waveform.png)
-
-```
-clk:     ┌┐┌┐┌┐┌┐┌┐┌┐┌┐┌┐┌┐┌┐┌┐┌┐
-pwm_in:  ────────┐         ┌──────
-                 └─────────┘
-hs_out:  ────────┐             ┌──
-                 └─────────────┘
-                 |← dead-time →|
-ls_out:  ────────────┐     ┌──────
-                     └─────┘
-                 |←dt→|   |←dt→|
-```
 
 At 100 MHz clock and DEAD_CYCLES=4:
 - Each clock cycle = 10 ns
