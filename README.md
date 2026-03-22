@@ -14,23 +14,43 @@ The fix is **dead-time insertion**: a small blanking window where both outputs a
 
 ## Architecture
 
+![Architecture](arch.png)
+
 ```
-                  ┌─────────────┐       ┌──────────────────┐
-  duty  ─────────►│             │       │                  ├──► hs_out
-  period ─────────► pwm_gen.v   ├──────►│  dead_time.v     │
-  clk   ─────────►│             │pwm_out│                  ├──► ls_out
-  rst   ─────────►│             │       │                  │
-                  └─────────────┘       └──────────────────┘
+Inputs          pwm_gen.v              dead_time.v         Outputs
+─────────       ───────────────        ──────────────      ────────
+duty[7:0]  ──►  8-bit counter     ──►  Transition          hs_out
+period[7:0]──►  duty compare      pwm  detector
+clk        ──►  logic             out  4-cycle blanking ──► ls_out
+rst        ──►                         HS / LS logic
 ```
 
 - `pwm_gen.v` generates a raw PWM signal based on duty cycle and period
-- `dead_time.v` takes that signal and produces two complementary gate outputs with a safe blanking gap between every transition
-- Both hs_out and ls_out are **never HIGH simultaneously** — guaranteed by design
+- `dead_time.v` takes that signal and produces two complementary gate outputs with a safe blanking gap on every transition
+- `hs_out` and `ls_out` are **never HIGH simultaneously** — guaranteed by design
 
 ---
+
 ## Timing Diagram
-![Dead-Time Waveform](waveform.png)
+
+![Timing Diagram](waveform.png)
+
 ```
+clk:     ┌┐┌┐┌┐┌┐┌┐┌┐┌┐┌┐┌┐┌┐┌┐┌┐
+pwm_in:  ────────┐         ┌──────
+                 └─────────┘
+hs_out:  ────────┐             ┌──
+                 └─────────────┘
+                 |← dead-time →|
+ls_out:  ────────────┐     ┌──────
+                     └─────┘
+                 |←dt→|   |←dt→|
+```
+
+At 100 MHz clock and DEAD_CYCLES=4:
+- Each clock cycle = 10 ns
+- Dead-time = 4 × 10 ns = **40 ns**
+- Both outputs forced LOW for 40 ns on every switching edge
 
 ---
 
@@ -44,15 +64,13 @@ period = 10, duty = 6:
 
 counter:  0  1  2  3  4  5  6  7  8  9  0  1  2 ...
 pwm_out:  1  1  1  1  1  1  0  0  0  0  1  1  1 ...
-          |<---- duty=6 HIGH --->|<-- LOW -->|
+          |<----- 60% HIGH ----->|<- LOW ->|
 ```
-
-This gives a 60% duty cycle. Change `duty` at runtime to change speed.
 
 ### Parameters
 | Parameter | Default | Description |
 |---|---|---|
-| `CNT_WIDTH` | 8 | Counter bit width. 8-bit = 0–255 range |
+| `CNT_WIDTH` | 8 | Counter bit width — 8-bit gives 0–255 range |
 
 ### Ports
 | Port | Direction | Description |
@@ -73,21 +91,6 @@ The module watches `pwm_in` for any transition (rising or falling edge). The mom
 2. A counter starts counting `DEAD_CYCLES` clock cycles
 3. Only after the counter expires does the correct output turn ON
 
-```
-pwm_in:   ─────────╗          ╔─────────
-                   ║          ║
-hs_out:   ─────────╝__________╔─────────
-                   dead-time ►│
-ls_out:   _________╔──────────╝_________
-                   │◄ dead-time
-                   
-Both LOW during dead-time window — shoot-through impossible
-```
-
-At 100MHz clock and DEAD_CYCLES=4:
-- Each cycle = 10ns
-- Dead-time = 4 × 10ns = **40ns**
-
 ### Parameters
 | Parameter | Default | Description |
 |---|---|---|
@@ -107,7 +110,7 @@ At 100MHz clock and DEAD_CYCLES=4:
 ## Testbenches
 
 ### `tb_pwm.v` — Functional Verification
-Tests 5 fixed duty cycles and checks for shoot-through at every clock edge.
+Tests 5 fixed duty cycles and checks for shoot-through at every clock edge using assertions.
 
 | Test | Duty Cycle | Result |
 |---|---|---|
@@ -119,11 +122,14 @@ Tests 5 fixed duty cycles and checks for shoot-through at every clock edge.
 
 ### `tb_sweep.v` — Parameter Sweep + Dead-Time Measurement
 Automatically sweeps duty cycle from 0% to 100% in steps of 10%. For each step it:
-- Lets the system settle for 5000ns
+- Lets the system settle for 5000 ns
 - Measures actual dead-time by timestamping the hs_out falling edge and ls_out rising edge
 - Counts any shoot-through violations
 
-### Sweep Results
+---
+
+## Results
+
 ```
 --------------------------------------------
 Duty Cycle Sweep - 100MHz Clock, Period=100
@@ -144,7 +150,7 @@ RESULT: ALL PASSED - Zero shoot-through detected
 --------------------------------------------
 ```
 
-> Note: 0% duty shows 25ns instead of 40ns — this is expected. At 0% duty, pwm_in never goes HIGH so the hs_out→ls_out transition never completes a full dead-time measurement cycle. The shoot-through check still passes.
+> **Note on 0% duty (25 ns):** At 0% duty, `pwm_in` never goes HIGH so the hs_out → ls_out transition never completes a full dead-time measurement cycle. The shoot-through check still passes — this is expected behaviour.
 
 ---
 
@@ -162,7 +168,7 @@ RESULT: ALL PASSED - Zero shoot-through detected
 
 ## How to Run
 
-**Requirements:** [Icarus Verilog](http://bleyer.org/icarus/) + GTKWave (bundled with installer)
+**Requirements:** [Icarus Verilog](http://bleyer.org/icarus/) — GTKWave bundled with installer on Windows.
 
 **Functional test:**
 ```bash
@@ -176,15 +182,16 @@ iverilog -o sweep.out pwm_gen.v dead_time.v tb_sweep.v
 vvp sweep.out
 ```
 
-**View waveforms:**
+**View waveforms (Windows):**
 ```bash
 "C:\iverilog\gtkwave\bin\gtkwave.exe" sweep_wave.vcd
 ```
-Add signals `clk`, `pwm_out`, `hs_out`, `ls_out` — zoom in on any transition to see the dead-time gap.
+
+Add signals `clk`, `pwm_out`, `hs_out`, `ls_out` — zoom into any switching edge to see the 40 ns dead-time gap clearly.
 
 ---
 
 ## Tools
 - Icarus Verilog (simulation)
 - GTKWave (waveform viewer)
-- Target: Xilinx Artix-7 (for synthesis)
+- Target: Xilinx Artix-7 (synthesis)
